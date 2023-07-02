@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Camer</title>
     <style>
       body {
         margin: 0;
@@ -13,50 +13,52 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+
+    <select id="device-select">
+      <option value="">--Please choose an option--</option>
+    </select>
+    <button id="get-devices-button">Get devices</button>
+    <button id="open-device-button">Open selected device</button>
+    <div id="video-container"></div>
+
     <script>
       (() => {
-        const root = document.getElementById("root");
-        let video;
+        let deviceSelect = document.getElementById("device-select");
+        let getDevicesButton = document.getElementById("get-devices-button");
+        let openDeviceButton = document.getElementById("open-device-button");
+        let videoContainer = document.getElementById("video-container");
 
-        let constraints = { video: { width: 1280, height: 720 }, audio: false };
+        getDevicesButton.addEventListener("click", async () => {
+          // Lấy tất cả thiết bị
+          let devices = await navigator.mediaDevices.enumerateDevices();
 
-        function getMedia() {
-          video = document.createElement("video");
-          root.append(video);
+          // Lọc thiết bị "webcam"
+          devices = devices.filter((d) => d.kind == "videoinput");
 
-          navigator.mediaDevices
-            .getUserMedia(constraints)
-            .then((stream) => {
-              video.srcObject = stream;
-              video.play();
-            })
-            .catch(handleError);
-        }
-
-        function handleError(err) {
-          video.remove();
-
-          const message = document.createElement("p");
-          message.textContent = err;
-          root.append(message);
-
-          const button = document.createElement("button");
-          button.textContent = "Try Again";
-          root.append(button);
-
-          button.addEventListener("click", () => {
-            message.remove();
-            button.remove();
-            getMedia();
+          let elements = devices.map((d) => {
+            let element = document.createElement("option");
+            element.value = d.deviceId;
+            element.textContent = d.label;
+            return element;
           });
-        }
 
-        function startup() {
-          getMedia();
-        }
+          // Thay vào các "webcam" mới
+          deviceSelect.replaceChildren(...elements);
+        });
 
-        window.addEventListener("load", startup, false);
+        openDeviceButton.addEventListener("click", async () => {
+          if (deviceSelect.value == "") return;
+
+          let videoElement = document.createElement("video");
+          videoContainer.replaceChildren(videoElement);
+
+          let mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: deviceSelect.value, width: 1280, height: 720 },
+          });
+
+          videoElement.srcObject = mediaStream;
+          await videoElement.play();
+        });
       })();
     </script>
   </body>
