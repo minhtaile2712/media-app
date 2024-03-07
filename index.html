@@ -28,24 +28,49 @@
         let openDeviceButton = document.getElementById("open-device-button");
         let videoContainer = document.getElementById("video-container");
 
+        // async function tryCameraResolution(width, height) {
+        //   await navigator.mediaDevices
+        //     .getUserMedia({ video: { width, height } })
+        //     .then((mediaStream) => {
+        //       mediaStream.getTracks().forEach((track) => track.stop());
+        //       console.log(`Resolution ${width}x${height} supported`);
+        //     })
+        //     .catch((error) => {
+        //       if (error.name === "OverconstrainedError")
+        //         console.log(`Resolution ${width}x${height} not supported`);
+        //       else console.error("Error accessing camera:", error);
+        //     });
+        // }
+
+        // function tryManyCameraResolutions() {
+        //   tryCameraResolution(3840, 2160);
+        //   tryCameraResolution(1920, 1080);
+        //   tryCameraResolution(1280, 720);
+        //   tryCameraResolution(640, 480);
+        // }
+
+        async function promptForCameraPermission() {
+          await navigator.mediaDevices
+            .getUserMedia({ video: true })
+            .then((mS) => mS.getTracks().forEach((track) => track.stop()))
+            .catch((error) => console.log("Error:", error.message));
+        }
+
         getDevicesButton.addEventListener("click", async () => {
-          // Đòi quyền truy cập
-          await navigator.mediaDevices.getUserMedia({ video: true });
+          // tryManyCameraResolutions();
+          await promptForCameraPermission();
 
-          // Lấy tất cả thiết bị
+          // Lọc lấy thiết bị "webcam" từ danh sách các thiết bị
           let devices = await navigator.mediaDevices.enumerateDevices();
-
-          // Danh sách trả về thường chứa thêm thiết bị khác, lọc lấy thiết bị "webcam"
           devices = devices.filter((d) => d.kind == "videoinput");
 
+          // Thêm các thiết bị "webcam" vừa tìm được vào danh sách để lựa chọn
           let elements = devices.map((d) => {
             let element = document.createElement("option");
             element.value = d.deviceId;
             element.textContent = d.label;
             return element;
           });
-
-          // Thêm các thiết bị "webcam" vừa tìm được vào danh sách để lựa chọn
           deviceSelect.replaceChildren(...elements);
         });
 
@@ -56,7 +81,11 @@
           videoContainer.replaceChildren(videoElement);
 
           let mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: deviceSelect.value, width: 1280, height: 720 },
+            video: {
+              deviceId: deviceSelect.value,
+              width: 1280,
+              height: 720,
+            },
           });
 
           videoElement.srcObject = mediaStream;
