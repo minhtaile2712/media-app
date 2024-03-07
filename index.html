@@ -29,10 +29,13 @@
         let videoContainer = document.getElementById("video-container");
 
         getDevicesButton.addEventListener("click", async () => {
+          // Đòi quyền truy cập
+          await navigator.mediaDevices.getUserMedia({ video: true });
+
           // Lấy tất cả thiết bị
           let devices = await navigator.mediaDevices.enumerateDevices();
 
-          // Lọc thiết bị "webcam"
+          // Danh sách trả về thường chứa thêm thiết bị khác, lọc lấy thiết bị "webcam"
           devices = devices.filter((d) => d.kind == "videoinput");
 
           let elements = devices.map((d) => {
@@ -42,7 +45,7 @@
             return element;
           });
 
-          // Thay vào các "webcam" mới
+          // Thêm các thiết bị "webcam" vừa tìm được vào danh sách để lựa chọn
           deviceSelect.replaceChildren(...elements);
         });
 
