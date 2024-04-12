@@ -14,16 +14,28 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
+    <button id="get-devices-button">Get devices</button>
+
     <select id="device-select">
       <option value="">--Please choose an option--</option>
     </select>
-    <button id="get-devices-button">Get devices</button>
-    <button id="open-device-button">Open selected device</button>
+
+    <select id="resolution-select">
+      <option value="1024x576">1024x576</option>
+      <option value="1280x720">1280x720</option>
+      <option value="1920x1080">1920x1080</option>
+      <option value="2560x1440">2560x1440</option>
+      <option value="3840x2160">3840x2160</option>
+    </select>
+
+    <button id="open-device-button">Open device</button>
+
     <div id="video-container"></div>
 
     <script>
       (() => {
         let deviceSelect = document.getElementById("device-select");
+        let resolutionSelect = document.getElementById("resolution-select");
         let getDevicesButton = document.getElementById("get-devices-button");
         let openDeviceButton = document.getElementById("open-device-button");
         let videoContainer = document.getElementById("video-container");
@@ -80,11 +92,15 @@
           let videoElement = document.createElement("video");
           videoContainer.replaceChildren(videoElement);
 
+          const [width, height] = resolutionSelect.value
+            .split("x")
+            .map((x) => Number(x));
+
           let mediaStream = await navigator.mediaDevices.getUserMedia({
             video: {
               deviceId: deviceSelect.value,
-              width: 1280,
-              height: 720,
+              width: width,
+              height: height,
             },
           });
 
