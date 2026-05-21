@@ -1,8 +1,7 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Media App</title>
     <style>
@@ -12,102 +11,147 @@
     </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="app"></div>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+      const app = document.getElementById("app");
 
-    <button id="get-devices-button">Get devices</button>
+      function HomePage() {
+        const resolutions = [
+          // "4096x2160", // 256:135
+          // "3840x2160", // 16:9
+          "1920x1080", // 16:9
+          "1680x1050", // 16:10
+          "1600x1200", // 4:3
+          "1440x900", // 16:10
+          "1400x1050", // 4:3
+          "1366x768", // 16:9
+          "1360x768", // 85:48
+          "1280x1024", // 5:4
+          "1280x960", // 4:3
+          "1280x800", // 16:10
+          "1280x768", // 5:3
+          "1280x720", // 16:9
+          "1024x768", // 4:3
+          "800x600", // 4:3
+          "720x576", // 5:4
+          "720x480", // 3:2
+          "640x480", // 4:3
+        ];
 
-    <select id="device-select">
-      <option value="">--Please choose an option--</option>
-    </select>
-
-    <select id="resolution-select">
-      <option value="1024x576">1024x576</option>
-      <option value="1280x720">1280x720</option>
-      <option value="1920x1080">1920x1080</option>
-      <option value="2560x1440">2560x1440</option>
-      <option value="3840x2160">3840x2160</option>
-    </select>
-
-    <button id="open-device-button">Open device</button>
-
-    <div id="video-container"></div>
-
-    <script>
-      (() => {
-        let deviceSelect = document.getElementById("device-select");
-        let resolutionSelect = document.getElementById("resolution-select");
-        let getDevicesButton = document.getElementById("get-devices-button");
-        let openDeviceButton = document.getElementById("open-device-button");
-        let videoContainer = document.getElementById("video-container");
-
-        // async function tryCameraResolution(width, height) {
-        //   await navigator.mediaDevices
-        //     .getUserMedia({ video: { width, height } })
-        //     .then((mediaStream) => {
-        //       mediaStream.getTracks().forEach((track) => track.stop());
-        //       console.log(`Resolution ${width}x${height} supported`);
-        //     })
-        //     .catch((error) => {
-        //       if (error.name === "OverconstrainedError")
-        //         console.log(`Resolution ${width}x${height} not supported`);
-        //       else console.error("Error accessing camera:", error);
+        // async function tryResolutionAsync(w, h) {
+        //   try {
+        //     const stream = await navigator.mediaDevices.getUserMedia({
+        //       video: { width: { exact: w }, height: { exact: h } },
         //     });
+
+        //     const track = stream.getVideoTracks()[0];
+        //     const settings = track.getSettings();
+        //     console.log(`Got: ${settings.width}x${settings.height}`);
+
+        //     stream.getTracks().forEach((t) => t.stop());
+        //   } catch (error) {
+        //     if (error.name === "OverconstrainedError") {
+        //       console.log(`Resolution ${w}x${h} not supported`);
+        //     } else console.error("Error:", error);
+        //   }
         // }
 
-        // function tryManyCameraResolutions() {
-        //   tryCameraResolution(3840, 2160);
-        //   tryCameraResolution(1920, 1080);
-        //   tryCameraResolution(1280, 720);
-        //   tryCameraResolution(640, 480);
+        // async function tryManyResolutionsAsync() {
+        //   for (const res of resolutions) {
+        //     const [width, height] = res.split("x");
+        //     await tryResolutionAsync(width, height);
+        //   }
         // }
 
-        async function promptForCameraPermission() {
+        async function promptForPermissionAsync() {
           await navigator.mediaDevices
             .getUserMedia({ video: true })
             .then((mS) => mS.getTracks().forEach((track) => track.stop()))
             .catch((error) => console.log("Error:", error.message));
         }
 
-        getDevicesButton.addEventListener("click", async () => {
-          // tryManyCameraResolutions();
-          await promptForCameraPermission();
+        const [listedDevices, setListedDevices] = React.useState([]);
+        const [selectedDevice, setSelectedDevice] = React.useState("");
+        const [selectedResolution, setSelectedResolution] = React.useState("1280x720");
+        const [isVideoOpened, setIsVideoOpened] = React.useState(false);
 
-          // Lọc lấy thiết bị "webcam" từ danh sách các thiết bị
+        async function handleListDevices() {
+          await promptForPermissionAsync();
+          // await tryManyResolutionsAsync();
           let devices = await navigator.mediaDevices.enumerateDevices();
-          devices = devices.filter((d) => d.kind == "videoinput");
+          devices = devices.filter((d) => d.kind === "videoinput");
+          setListedDevices(devices);
+          if (devices.length) setSelectedDevice(devices[0].deviceId);
+        }
 
-          // Thêm các thiết bị "webcam" vừa tìm được vào danh sách để lựa chọn
-          let elements = devices.map((d) => {
-            let element = document.createElement("option");
-            element.value = d.deviceId;
-            element.textContent = d.label;
-            return element;
-          });
-          deviceSelect.replaceChildren(...elements);
-        });
+        return (
+          <div>
+            <div>
+              <button onClick={handleListDevices}>List devices</button>
 
-        openDeviceButton.addEventListener("click", async () => {
-          if (deviceSelect.value == "") return;
+              <select value={selectedDevice} onChange={(e) => setSelectedDevice(e.target.value)}>
+                <option value="" disabled>
+                  -- Select device --
+                </option>
+                {listedDevices.map(({ deviceId, label }) => (
+                  <option key={deviceId} value={deviceId}>
+                    {label}
+                  </option>
+                ))}
+              </select>
 
-          let videoElement = document.createElement("video");
-          videoContainer.replaceChildren(videoElement);
+              <select value={selectedResolution} onChange={(e) => setSelectedResolution(e.target.value)}>
+                {resolutions.map((res) => (
+                  <option key={res} value={res}>
+                    {res}
+                  </option>
+                ))}
+              </select>
 
-          const [width, height] = resolutionSelect.value
-            .split("x")
-            .map((x) => Number(x));
+              {isVideoOpened ? (
+                <button disabled={!isVideoOpened} onClick={() => setIsVideoOpened(false)}>
+                  Close
+                </button>
+              ) : (
+                <button disabled={!selectedDevice || !selectedResolution} onClick={() => setIsVideoOpened(true)}>
+                  Open
+                </button>
+              )}
+            </div>
+            {isVideoOpened && <Video deviceId={selectedDevice} resolution={selectedResolution} />}
+          </div>
+        );
+      }
 
-          let mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: deviceSelect.value,
-              width: width,
-              height: height,
-            },
-          });
+      function Video({ deviceId, resolution }) {
+        const videoRef = React.useRef(null);
+        const [width, height] = resolution.split("x").map((x) => Number(x));
 
-          videoElement.srcObject = mediaStream;
-          await videoElement.play();
-        });
-      })();
+        React.useEffect(() => {
+          let mediaStream;
+
+          async function startVideo() {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId, width, height },
+            });
+            videoRef.current.srcObject = mediaStream;
+            await videoRef.current.play();
+          }
+          startVideo();
+
+          return () => {
+            mediaStream?.getTracks().forEach((t) => t.stop());
+          };
+        }, [deviceId, width, height]);
+
+        return <video ref={videoRef} />;
+      }
+
+      const root = ReactDOM.createRoot(app);
+      root.render(<HomePage />);
     </script>
   </body>
 </html>
