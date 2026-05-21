@@ -16,83 +16,94 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="text/babel">
-      const app = document.getElementById("app");
+      const resList = [
+        "4096x2160", // 256:135
+        "3840x2160", // 16:9
+        "1920x1080", // 16:9
+        "1680x1050", // 16:10
+        "1600x1200", // 4:3
+        "1440x900", // 16:10
+        "1400x1050", // 4:3
+        "1366x768", // 16:9
+        "1360x768", // 85:48
+        "1280x1024", // 5:4
+        "1280x960", // 4:3
+        "1280x800", // 16:10
+        "1280x768", // 5:3
+        "1280x720", // 16:9
+        "1024x768", // 4:3
+        "800x600", // 4:3
+        "720x576", // 5:4
+        "720x480", // 3:2
+        "640x480", // 4:3
+      ];
 
       function HomePage() {
-        const resolutions = [
-          // "4096x2160", // 256:135
-          // "3840x2160", // 16:9
-          "1920x1080", // 16:9
-          "1680x1050", // 16:10
-          "1600x1200", // 4:3
-          "1440x900", // 16:10
-          "1400x1050", // 4:3
-          "1366x768", // 16:9
-          "1360x768", // 85:48
-          "1280x1024", // 5:4
-          "1280x960", // 4:3
-          "1280x800", // 16:10
-          "1280x768", // 5:3
-          "1280x720", // 16:9
-          "1024x768", // 4:3
-          "800x600", // 4:3
-          "720x576", // 5:4
-          "720x480", // 3:2
-          "640x480", // 4:3
-        ];
+        const [listedDevices, setListedDevices] = React.useState([]);
+        const [selectedDeviceId, setSelectedDeviceId] = React.useState("");
+        const [resolutions, setResolutions] = React.useState({});
+        const [selectedResolution, setSelectedResolution] = React.useState("");
+        const [isVideoOpened, setIsVideoOpened] = React.useState(false);
 
-        // async function tryResolutionAsync(w, h) {
-        //   try {
-        //     const stream = await navigator.mediaDevices.getUserMedia({
-        //       video: { width: { exact: w }, height: { exact: h } },
-        //     });
+        const [isListingDevices, setIsListingDevices] = React.useState(false);
+        async function handleListDevices() {
+          setIsListingDevices(true);
 
-        //     const track = stream.getVideoTracks()[0];
-        //     const settings = track.getSettings();
-        //     console.log(`Got: ${settings.width}x${settings.height}`);
-
-        //     stream.getTracks().forEach((t) => t.stop());
-        //   } catch (error) {
-        //     if (error.name === "OverconstrainedError") {
-        //       console.log(`Resolution ${w}x${h} not supported`);
-        //     } else console.error("Error:", error);
-        //   }
-        // }
-
-        // async function tryManyResolutionsAsync() {
-        //   for (const res of resolutions) {
-        //     const [width, height] = res.split("x");
-        //     await tryResolutionAsync(width, height);
-        //   }
-        // }
-
-        async function promptForPermissionAsync() {
+          // prompt for permission
           await navigator.mediaDevices
             .getUserMedia({ video: true })
             .then((mS) => mS.getTracks().forEach((track) => track.stop()))
             .catch((error) => console.log("Error:", error.message));
-        }
 
-        const [listedDevices, setListedDevices] = React.useState([]);
-        const [selectedDevice, setSelectedDevice] = React.useState("");
-        const [selectedResolution, setSelectedResolution] = React.useState("1280x720");
-        const [isVideoOpened, setIsVideoOpened] = React.useState(false);
-
-        async function handleListDevices() {
-          await promptForPermissionAsync();
-          // await tryManyResolutionsAsync();
           let devices = await navigator.mediaDevices.enumerateDevices();
           devices = devices.filter((d) => d.kind === "videoinput");
           setListedDevices(devices);
-          if (devices.length) setSelectedDevice(devices[0].deviceId);
+          // if (devices.length) setSelectedDeviceId(devices[0].deviceId);
+
+          setIsListingDevices(false);
+        }
+
+        const [isCheckingResolutions, setIsCheckingResolutions] = React.useState(false);
+        async function handleCheckResolutions() {
+          setIsCheckingResolutions(true);
+
+          const supported = [];
+          for (const res of resList) {
+            const [w, h] = res.split("x");
+
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: selectedDeviceId }, width: { exact: w }, height: { exact: h } },
+              });
+
+              const settings = stream.getVideoTracks()[0].getSettings();
+              console.log(`✅ ${res} supported`);
+              supported.push(res);
+
+              stream.getTracks().forEach((t) => t.stop());
+            } catch (error) {
+              if (error.name === "OverconstrainedError") console.log(`⛔ ${res} unusable`);
+              else console.error("Error:", error);
+            }
+          }
+          setResolutions((prev) => ({ ...prev, [selectedDeviceId]: supported }));
+
+          setIsCheckingResolutions(false);
+        }
+
+        function handleSelectDevice(e) {
+          setSelectedDeviceId(e.target.value);
+          setSelectedResolution("");
+          setIsVideoOpened(false);
         }
 
         return (
           <div>
             <div>
-              <button onClick={handleListDevices}>List devices</button>
-
-              <select value={selectedDevice} onChange={(e) => setSelectedDevice(e.target.value)}>
+              <button disabled={isListingDevices} onClick={handleListDevices}>
+                🔄
+              </button>
+              <select value={selectedDeviceId} onChange={handleSelectDevice}>
                 <option value="" disabled>
                   -- Select device --
                 </option>
@@ -103,25 +114,28 @@
                 ))}
               </select>
 
+              <button disabled={!selectedDeviceId || isCheckingResolutions} onClick={handleCheckResolutions}>
+                🔄
+              </button>
               <select value={selectedResolution} onChange={(e) => setSelectedResolution(e.target.value)}>
-                {resolutions.map((res) => (
+                <option value="" disabled>
+                  -- Select resolution --
+                </option>
+                {resolutions[selectedDeviceId]?.map((res) => (
                   <option key={res} value={res}>
                     {res}
                   </option>
                 ))}
               </select>
 
-              {isVideoOpened ? (
-                <button disabled={!isVideoOpened} onClick={() => setIsVideoOpened(false)}>
-                  Close
-                </button>
-              ) : (
-                <button disabled={!selectedDevice || !selectedResolution} onClick={() => setIsVideoOpened(true)}>
-                  Open
-                </button>
-              )}
+              <button
+                disabled={!selectedDeviceId || !selectedResolution}
+                onClick={() => setIsVideoOpened((prev) => !prev)}
+              >
+                {isVideoOpened ? "🔴" : "🔵"}
+              </button>
             </div>
-            {isVideoOpened && <Video deviceId={selectedDevice} resolution={selectedResolution} />}
+            {isVideoOpened && <Video deviceId={selectedDeviceId} resolution={selectedResolution} />}
           </div>
         );
       }
@@ -135,7 +149,7 @@
 
           async function startVideo() {
             mediaStream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId, width, height },
+              video: { deviceId: { exact: deviceId }, width, height },
             });
             videoRef.current.srcObject = mediaStream;
             await videoRef.current.play();
@@ -145,11 +159,12 @@
           return () => {
             mediaStream?.getTracks().forEach((t) => t.stop());
           };
-        }, [deviceId, width, height]);
+        }, [deviceId, resolution]);
 
         return <video ref={videoRef} />;
       }
 
+      const app = document.getElementById("app");
       const root = ReactDOM.createRoot(app);
       root.render(<HomePage />);
     </script>
