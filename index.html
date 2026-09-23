@@ -43,6 +43,7 @@
         const [selectedDeviceId, setSelectedDeviceId] = React.useState("");
         const [resolutions, setResolutions] = React.useState({});
         const [selectedResolution, setSelectedResolution] = React.useState("");
+        const [scaleFactor, setScaleFactor] = React.useState(2);
         const [isVideoOpened, setIsVideoOpened] = React.useState(false);
 
         const [isListingDevices, setIsListingDevices] = React.useState(false);
@@ -88,12 +89,15 @@
           }
           setResolutions((prev) => ({ ...prev, [selectedDeviceId]: supported }));
 
+          if (supported.includes("1280x720")) setSelectedResolution("1280x720");
+
           setIsCheckingResolutions(false);
         }
 
         function handleSelectDevice(e) {
           setSelectedDeviceId(e.target.value);
-          setSelectedResolution("");
+          if (resolutions[selectedDeviceId]?.includes("1280x720")) setSelectedResolution("1280x720");
+          else setSelectedResolution("");
           setIsVideoOpened(false);
         }
 
@@ -128,6 +132,10 @@
                 ))}
               </select>
 
+              <button onClick={() => setScaleFactor((s) => Math.max(1, s - 1))}>-</button>
+              <span>{scaleFactor}x</span>
+              <button onClick={() => setScaleFactor((s) => Math.min(8, s + 1))}>+</button>
+
               <button
                 disabled={!selectedDeviceId || !selectedResolution}
                 onClick={() => setIsVideoOpened((prev) => !prev)}
@@ -135,33 +143,96 @@
                 {isVideoOpened ? "🔴" : "🔵"}
               </button>
             </div>
-            {isVideoOpened && <Video deviceId={selectedDeviceId} resolution={selectedResolution} />}
+            {isVideoOpened && (
+              <Video deviceId={selectedDeviceId} resolution={selectedResolution} scaleFactor={scaleFactor} />
+            )}
           </div>
         );
       }
 
-      function Video({ deviceId, resolution }) {
-        const videoRef = React.useRef(null);
-        const [width, height] = resolution.split("x").map((x) => Number(x));
+      function useDevicePixelRatio() {
+        const [dpr, setDpr] = React.useState(window.devicePixelRatio || 1);
+
+        React.useEffect(() => {
+          let mql;
+
+          function updateDpr() {
+            const newDpr = window.devicePixelRatio || 1;
+            setDpr(newDpr);
+
+            // Media query only fires once for the ratio it was created with,
+            // so re-subscribe to a fresh query matching the new ratio.
+            mql?.removeEventListener("change", updateDpr);
+            mql = window.matchMedia(`(resolution: ${newDpr}dppx)`);
+            mql.addEventListener("change", updateDpr);
+          }
+
+          mql = window.matchMedia(`(resolution: ${dpr}dppx)`);
+          mql.addEventListener("change", updateDpr);
+
+          return () => mql?.removeEventListener("change", updateDpr);
+        }, []);
+
+        return dpr;
+      }
+
+      function Video({ deviceId, resolution, scaleFactor }) {
+        const canvasRef = React.useRef(null);
+        const [width, height] = resolution.split("x").map(Number);
+        const dpr = useDevicePixelRatio();
 
         React.useEffect(() => {
           let mediaStream;
+          let rafId;
+          let video; // off-DOM video element used purely as a decode source
 
           async function startVideo() {
             mediaStream = await navigator.mediaDevices.getUserMedia({
               video: { deviceId: { exact: deviceId }, width, height },
             });
-            videoRef.current.srcObject = mediaStream;
-            await videoRef.current.play();
+
+            video = document.createElement("video");
+            video.srcObject = mediaStream;
+            video.muted = true;
+            await video.play();
+
+            const canvas = canvasRef.current;
+            canvas.width = width; // backing store = native resolution
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = false; // no smoothing when drawing frame in
+
+            function draw() {
+              ctx.drawImage(video, 0, 0, width, height);
+              // requestVideoFrameCallback syncs to actual video frame delivery,
+              // rather than the display refresh rate — more efficient & correct.
+              if (video.requestVideoFrameCallback) {
+                rafId = video.requestVideoFrameCallback(draw);
+              } else {
+                rafId = requestAnimationFrame(draw); // fallback for older browsers
+              }
+            }
+            draw();
           }
           startVideo();
 
           return () => {
+            if (video?.cancelVideoFrameCallback && rafId) video.cancelVideoFrameCallback(rafId);
+            else if (rafId) cancelAnimationFrame(rafId);
             mediaStream?.getTracks().forEach((t) => t.stop());
           };
         }, [deviceId, resolution]);
 
-        return <video ref={videoRef} />;
+        return (
+          <canvas
+            ref={canvasRef}
+            style={{
+              width: `${(width * scaleFactor) / dpr}px`,
+              height: `${(height * scaleFactor) / dpr}px`,
+              imageRendering: "pixelated",
+            }}
+          />
+        );
       }
 
       const app = document.getElementById("app");
